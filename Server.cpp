@@ -52,6 +52,13 @@ class Server {
                 if(n_sockt < 0) {
                     printf("> Error accepting requests\n");
                 }
+                /* Read socket information */
+                char buff[2048] = {0};
+                int vread = recv(n_sockt,buff,2048,0);
+                if(vread < 0) {
+                    printf("> Error reading socket information\n");
+                }
+                buff[vread] = '\0';
             }
         }
 };
