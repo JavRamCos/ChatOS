@@ -1,4 +1,5 @@
 #include <iostream>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -23,6 +24,7 @@ class Server {
         struct sockaddr_in clnt_address;
         int buff_size;
         int max_users;
+        std::vector<USER> users;
     public:
         /* Constructor to define initial class params */
         Server(int s_port) {
@@ -84,6 +86,13 @@ class Server {
                 /* Handle new user registration */
                 if(clnt_rqst.option() == 0) {
                     printf("> New user registration ...\n");
+                    /* New user struct definition */
+                    struct USER new_user;
+                    new_user.username = clnt_rqst.newuser().username();
+                    new_user.ip = clnt_rqst.newuser().ip();
+                    new_user.status = "ACTIVE";
+                    /* Append new user to user list */
+                    users.push_back(new_user);
                 }
             }
         }
