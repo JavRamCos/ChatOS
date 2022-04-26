@@ -6,13 +6,17 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <string>
+#include <pthread.h>
 #include "protocol.pb.h"
+
+#define MAXUSERS 10
 
 /* Struct to store user information */
 struct USER {
     std::string username;
     std::string ip;
     std::string status;
+    int sockt;
 }
 
 /* Server class */
@@ -23,18 +27,20 @@ class Server {
         struct sockaddr_in srvr_address;
         struct sockaddr_in clnt_address;
         int buff_size;
-        int max_users;
+        int user_count;
         std::vector<USER> users;
+        pthread_t pool[MAXUSERS];
     public:
         /* Constructor to define initial class params */
         Server(int s_port) {
             this->port = s_port;
             this->buff_size = 2048;
-            this->max_users = 10;
+            this->user_count = 0;
         }
 
         /* Deconstructor to handle file and libraries closing */
         ~Server() {
+            close(this->sockt);
             google::protobuf::ShutdownProtobufLibrary();
         }
 
@@ -57,7 +63,7 @@ class Server {
                 return -1;
             }
             /* Socket listening */
-            int lstn_flag = listen(this->sockt,this->max_users);
+            int lstn_flag = listen(this->sockt,MAXUSERS);
             if(lstn_flag < 0) {
                 printf("> Error socket listen\n");
                 return -1;
@@ -67,7 +73,7 @@ class Server {
 
         /* Function to check and accept socket connections */
         void CheckConnections() {
-            while(1) {
+            while(this->user_count < MAXUSERS) {
                 /* Accept sockets requests */
                 int n_sockt = accept(this->sockt,(struct sockaddr*)&this->clnt_address,(socklen_t*)sizeof(this->clnt_address));
                 if(n_sockt < 0) {
@@ -91,7 +97,7 @@ class Server {
                     printf("> New user registration ...\n");
                     /* Check if new username is already registered */
                     int flag = 1;
-                    for(auto user = users.begin();user != users.end();user++) {
+                    for(auto user = this->users.begin();user != this->users.end();user++) {
                         if(user->username == clnt_rqst.newuser().username()) {
                             /* Username is already registered */
                             printf("> Username is already registered\n");
@@ -105,18 +111,23 @@ class Server {
                         new_user.username = clnt_rqst.newuser().username();
                         new_user.ip = clnt_rqst.newuser().ip();
                         new_user.status = "ACTIVE";
+                        new_user.sockt = n_sockt;
                         /* Append new user to user list */
-                        users.push_back(new_user);
+                        this->users.push_back(new_user);
                         /* Set correct server response */
                         response.set_option(chat::ServerResponse_Option_USER_LOGIN);
                         response.set_code(chat::ServerResponse_Code_SUCCESSFUL_OPERATION);
                         response.set_response("Successful User Registration");
+                        /* ==============  MULTITHREADING PENDING HERE  ============== */
+                        this->user_count += 1;
                     } else {
+                        /* Set error server response (Username already registered) */
                         response.set_option(chat::ServerResponse_Option_USER_LOGIN);
                         response.set_code(chat::ServerResponse_Code_FAILED_OPERATION);
-                        response.set_response("Unsuccessful User Registration");
+                        response.set_response("Username already registered");
                     }
                 } else {
+                    /* Set error server response (Unsuccessful user registration) */
                     response.set_option(chat::ServerResponse_Option_USER_LOGIN);
                     response.set_code(chat::ServerResponse_Code_FAILED_OPERATION);
                     response.set_response("Unsuccessful User Registration");
@@ -140,9 +151,16 @@ int main(int argc,char* argv[]) {
         return EXIT_FAILURE;
     }
     /* Server object creation */
+    printf("> Creating Server ...\n");
     int port = atoi(argv[1]);
     Server srvr(port);
+    printf("> Server created successfully\n");
     /* Setting server initial parameters */
-    srvr.SetInitParams();
+    printf("> Setting up Server ...\n");
+    int init_flag = srvr.SetInitParams();
+    if(init_flag < 0) {
+        return EXIT_FAILURE;
+    }
+    printf("> Server set up successfully\n");
     return EXIT_SUCCESS;
 }
