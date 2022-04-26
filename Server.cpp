@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include "protocol.pb.h"
 
 /* Clase Servidor */
 class Server {
@@ -11,10 +12,19 @@ class Server {
         int sockt;
         struct sockaddr_in srvr_address;
         struct sockaddr_in clnt_address;
+        int buff_size;
+        int max_users;
     public:
         /* Constructor to define initial class params */
         Server(int s_port) {
             this->port = s_port;
+            this->buff_size = 2048;
+            this->max_users = 10;
+        }
+
+        /* Deconstructor to handle file and libraries closing */
+        ~Server() {
+            google::protobuf::ShutdownProtobufLibrary();
         }
 
         /* Function to define server's initial parameters */
@@ -36,7 +46,7 @@ class Server {
                 return -1;
             }
             /* Socket listening */
-            int lstn_flag = listen(this->sockt,10);
+            int lstn_flag = listen(this->sockt,this->max_users);
             if(lstn_flag < 0) {
                 printf("> Error socket listen\n");
                 return -1;
@@ -53,12 +63,14 @@ class Server {
                     printf("> Error accepting requests\n");
                 }
                 /* Read socket information */
-                char buff[2048] = {0};
-                int vread = recv(n_sockt,buff,2048,0);
+                char buff[this->buff_size] = {0};
+                int vread = recv(n_sockt,buff,this->buff_size,0);
                 if(vread < 0) {
                     printf("> Error reading socket information\n");
                 }
                 buff[vread] = '\0';
+                /* Register new user */
+                chat::ClientRequest clnt_rqst;
             }
         }
 };
