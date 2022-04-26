@@ -33,6 +33,12 @@ class Server {
                 printf("> Error binding socket\n");
                 return -1;
             }
+            /* Socket listening */
+            int lstn_flag = listen(this->sockt,10);
+            if(lstn_flag < 0) {
+                printf("> Error socket listen\n");
+                return -1;
+            }
             return 0;
         }
 };
@@ -49,5 +55,7 @@ int main(int argc,char* argv[]) {
     /* Server object creation */
     int port = atoi(argv[1]);
     Server srvr(port);
+    /* Setting server initial parameters */
+    srvr.SetInitParams();
     return EXIT_SUCCESS;
 }
