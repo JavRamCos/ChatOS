@@ -9,13 +9,15 @@ class Server {
     private:
         int port;
         int sockt;
-        struct sockaddr_in address;
+        struct sockaddr_in srvr_address;
+        struct sockaddr_in clnt_address;
     public:
-        /* Constructor to define initial params */
+        /* Constructor to define initial class params */
         Server(int s_port) {
             this->port = s_port;
         }
 
+        /* Function to define server's initial parameters */
         int SetInitParams() {
             /* Creating socket connection */
             this->sockt = socket(AF_INET,SOCK_STREAM,0);
@@ -24,11 +26,11 @@ class Server {
                 return -1;
             }
             /* Address format */
-            this->address.sin_family = AF_INET;
-            this->address.sin_port = htons(this->port);
-            this->address.sin_addr.s_addr = INADDR_ANY;
+            this->srvr_address.sin_family = AF_INET;
+            this->srvr_address.sin_port = htons(this->port);
+            this->srvr_address.sin_addr.s_addr = INADDR_ANY;
             /* Socket binding */
-            int bind_flag = bind(this->sockt,(struct sockaddr*)&this->address,sizeof(this->address));
+            int bind_flag = bind(this->sockt,(struct sockaddr*)&this->srvr_address,sizeof(this->srvr_address));
             if(bind_flag < 0) {
                 printf("> Error binding socket\n");
                 return -1;
@@ -40,6 +42,17 @@ class Server {
                 return -1;
             }
             return 0;
+        }
+
+        /* Function to check and accept socket connections */
+        void CheckConnections() {
+            while(1) {
+                /* Accept sockets requests */
+                int n_sockt = accept(this->sockt,(struct sockaddr*)&this->clnt_address,(socklen_t*)sizeof(this->clnt_address));
+                if(n_sockt < 0) {
+                    printf("> Error accepting requests\n");
+                }
+            }
         }
 };
 
