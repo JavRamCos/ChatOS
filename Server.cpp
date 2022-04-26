@@ -3,9 +3,18 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <unistd.h>
+#include <string>
 #include "protocol.pb.h"
 
-/* Clase Servidor */
+/* Struct to store user information */
+struct USER {
+    std::string username;
+    std::string ip;
+    std::string status;
+}
+
+/* Server class */
 class Server {
     private:
         int port;
@@ -69,8 +78,13 @@ class Server {
                     printf("> Error reading socket information\n");
                 }
                 buff[vread] = '\0';
-                /* Register new user */
+                /* Parse new user petition */
                 chat::ClientRequest clnt_rqst;
+                clnt_rqst.ParseFromString((std::string)buff);
+                /* Handle new user registration */
+                if(clnt_rqst.option() == 0) {
+                    printf("> New user registration ...\n");
+                }
             }
         }
 };
