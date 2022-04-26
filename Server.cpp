@@ -80,20 +80,52 @@ class Server {
                     printf("> Error reading socket information\n");
                 }
                 buff[vread] = '\0';
+                std::string ser_str = buff;
                 /* Parse new user petition */
                 chat::ClientRequest clnt_rqst;
-                clnt_rqst.ParseFromString((std::string)buff);
+                clnt_rqst.ParseFromString(ser_str);
+                /* Server response */
+                chat::ServerResponse response;
                 /* Handle new user registration */
                 if(clnt_rqst.option() == 0) {
                     printf("> New user registration ...\n");
-                    /* New user struct definition */
-                    struct USER new_user;
-                    new_user.username = clnt_rqst.newuser().username();
-                    new_user.ip = clnt_rqst.newuser().ip();
-                    new_user.status = "ACTIVE";
-                    /* Append new user to user list */
-                    users.push_back(new_user);
+                    /* Check if new username is already registered */
+                    int flag = 1;
+                    for(auto user = users.begin();user != users.end();user++) {
+                        if(user->username == clnt_rqst.newuser().username()) {
+                            /* Username is already registered */
+                            printf("> Username is already registered\n");
+                            flag = 0;
+                            break;
+                        }
+                    }
+                    if(flag) {
+                        /* Username is not registered */
+                        struct USER new_user;
+                        new_user.username = clnt_rqst.newuser().username();
+                        new_user.ip = clnt_rqst.newuser().ip();
+                        new_user.status = "ACTIVE";
+                        /* Append new user to user list */
+                        users.push_back(new_user);
+                        /* Set correct server response */
+                        response.set_option(chat::ServerResponse_Option_USER_LOGIN);
+                        response.set_code(chat::ServerResponse_Code_SUCCESSFUL_OPERATION);
+                        response.set_response("Successful User Registration");
+                    } else {
+                        response.set_option(chat::ServerResponse_Option_USER_LOGIN);
+                        response.set_code(chat::ServerResponse_Code_FAILED_OPERATION);
+                        response.set_response("Unsuccessful User Registration");
+                    }
+                } else {
+                    response.set_option(chat::ServerResponse_Option_USER_LOGIN);
+                    response.set_code(chat::ServerResponse_Code_FAILED_OPERATION);
+                    response.set_response("Unsuccessful User Registration");
                 }
+                /* Send server response to socket */
+                response.SerializeToString(&ser_str);
+                char msg[ser_str.size() + 1];
+                strcpy(msg,ser_str.c_str());
+                send(n_sockt,msg,strlen(msg),0);
             }
         }
 };
