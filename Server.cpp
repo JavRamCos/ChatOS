@@ -23,6 +23,8 @@ struct USER {
 void* MessageHandler(void* args);
 int user_count = 0;
 std::vector<USER> users;
+pthread_mutex_t public_chat = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t private_chat = PTHREAD_MUTEX_INITIALIZER;
 
 /* Server class */
 class Server {
@@ -272,6 +274,32 @@ void* MessageHandler(void* args) {
                 }
                 case 4: {
                     /* Send message (Chat) */
+                    std::string mode = clnt_rqst.messg().receiver();
+                    if(mode == "all") {
+                        /* Public chat */
+                        pthread_mutex_lock(&public_chat);
+                        /* Set message object */
+                        chat::Message* messsage(new chat::Message);
+                        messsage->set_receiver(clnt_rqst.messg().receiver());
+                        messsage->set_sender(clnt_rqst.messg().sender());
+                        messsage->set_text(clnt_rqst.messg().text());
+                        /* Set Server response */
+                        chat::ServerResponse response;
+                        response.set_option(chat::ServerResponse_Option_SEND_MESSAGE);
+                        response.set_code(chat::ServerResponse_Code_SUCCESSFUL_OPERATION);
+                        response.set_allocated_messg(messsage);
+                        std::string clnt_msg;
+                        response.SerializeToString(&clnt_msg);
+                        char msg[clnt_msg.size() + 1];
+                        strcpy(msg,clnt_msg.c_str());
+                        /* Send message to all users */
+                        for(struct USER& user: users) {
+                            send(user.sockt,msg,strlen(msg),0);
+                        }
+                        pthread_mutex_unlock(&public_chat);
+                    } else {
+                        /* Private chat */
+                    }
                     break;
                 }
                 default:
