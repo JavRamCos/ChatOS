@@ -12,6 +12,9 @@
 #define MAXUSERS 10
 #define BUFFSIZE 2048
 
+void* MessageHandler(void* args);
+int user_count = 0;
+
 /* Struct to store user information */
 struct USER {
     std::string username;
@@ -27,14 +30,12 @@ class Server {
         int sockt;
         struct sockaddr_in srvr_address;
         struct sockaddr_in clnt_address;
-        int user_count;
         std::vector<USER> users;
         pthread_t pool[MAXUSERS];
     public:
         /* Constructor to define initial class params */
         Server(int s_port) {
             this->port = s_port;
-            this->user_count = 0;
         }
 
         /* Deconstructor to handle file and libraries closing */
@@ -72,7 +73,7 @@ class Server {
 
         /* Function to check and accept socket connections */
         void CheckConnections() {
-            while(this->user_count < MAXUSERS) {
+            while(user_count < MAXUSERS) {
                 /* Accept sockets requests */
                 int n_sockt = accept(this->sockt,(struct sockaddr*)&this->clnt_address,(socklen_t*)sizeof(this->clnt_address));
                 if(n_sockt < 0) {
@@ -117,8 +118,8 @@ class Server {
                         response.set_option(chat::ServerResponse_Option_USER_LOGIN);
                         response.set_code(chat::ServerResponse_Code_SUCCESSFUL_OPERATION);
                         response.set_response("Successful User Registration");
-                        pthread_create(&this->pool[this->user_count],NULL,MessageHandler,(void*)&new_user);
-                        this->user_count += 1;
+                        pthread_create(&this->pool[user_count],NULL,MessageHandler,(void*)&new_user);
+                        user_count += 1;
                     } else {
                         /* Set error server response (Username already registered) */
                         response.set_option(chat::ServerResponse_Option_USER_LOGIN);
@@ -137,15 +138,26 @@ class Server {
                 strcpy(msg,ser_str.c_str());
                 send(n_sockt,msg,strlen(msg),0);
             }
-        }
-
-        /* Function to create new thread with new user */
-        static void* MessageHandler(void* args) {
-            char buff[BUFFSIZE];
-            struct USER *n_user = (struct USER*)args;
-            int open_conn = 1;
-        }
+        } 
 };
+
+/* Function to create new thread with new user */
+void* MessageHandler(void* args) {
+    char buff[BUFFSIZE];
+    int open_conn = 1;
+    /* Handle user incoming messages */
+    struct USER *n_user = (struct USER*)args;
+    int u_sockt = n_user->sockt;
+    while(open_conn) {
+        /* Message handler */
+    }
+    /* Close user socket connection */
+    close(u_sockt);
+    user_count -= 1;
+    if(user_count < 0) { user_count = 0; }
+    /* Close user thread */
+    pthread_exit(NULL);
+}
 
 /* Program for Server, Chat Proyect */
 /* Javier Ramirez Cospin 18099 */
