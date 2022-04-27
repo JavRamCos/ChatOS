@@ -84,12 +84,13 @@ class Server {
                 int vread = recv(n_sockt,buff,BUFFSIZE,0);
                 if(vread < 0) {
                     printf("> Error reading socket information\n");
+                    continue;
                 }
                 buff[vread] = '\0';
-                std::string ser_str = buff;
+                std::string clnt_msg = buff;
                 /* Parse new user petition */
                 chat::ClientRequest clnt_rqst;
-                clnt_rqst.ParseFromString(ser_str);
+                clnt_rqst.ParseFromString(clnt_msg);
                 /* Server response */
                 chat::ServerResponse response;
                 /* Handle new user registration */
@@ -118,6 +119,7 @@ class Server {
                         response.set_option(chat::ServerResponse_Option_USER_LOGIN);
                         response.set_code(chat::ServerResponse_Code_SUCCESSFUL_OPERATION);
                         response.set_response("Successful User Registration");
+                        /* Create new user thread */
                         pthread_create(&this->pool[user_count],NULL,MessageHandler,(void*)&new_user);
                         user_count += 1;
                     } else {
@@ -133,9 +135,9 @@ class Server {
                     response.set_response("Unsuccessful User Registration");
                 }
                 /* Send server response to socket */
-                response.SerializeToString(&ser_str);
-                char msg[ser_str.size() + 1];
-                strcpy(msg,ser_str.c_str());
+                response.SerializeToString(&clnt_msg);
+                char msg[clnt_msg.size() + 1];
+                strcpy(msg,clnt_msg.c_str());
                 send(n_sockt,msg,strlen(msg),0);
             }
         } 
@@ -143,13 +145,25 @@ class Server {
 
 /* Function to create new thread with new user */
 void* MessageHandler(void* args) {
-    char buff[BUFFSIZE];
     int open_conn = 1;
     /* Handle user incoming messages */
     struct USER *n_user = (struct USER*)args;
     int u_sockt = n_user->sockt;
     while(open_conn) {
-        /* Message handler */
+        /* Read information from socket */
+        char buff[BUFFSIZE] = {0};
+        int vread = recv(u_sockt,buff,BUFFSIZE,0);
+        if(vread < 0) {
+            printf("> Error reading socket information\n");
+            continue;
+        } else {
+            buff[vread] = '\0';
+            /* Read client request */
+            std::string clnt_msg = buff;
+            chat::ClientRequest clnt_rqst;
+            clnt_rqst.ParseFromString(clnt_msg);
+            /* ============ HANDLE USER OPTIONS HERE  ============ */
+        }
     }
     /* Close user socket connection */
     close(u_sockt);
