@@ -29,10 +29,8 @@ pthread_mutex_t private_chat = PTHREAD_MUTEX_INITIALIZER;
 /* Server class */
 class Server {
     private:
-        int port;
-        int sockt;
-        struct sockaddr_in srvr_address;
-        struct sockaddr_in clnt_address;
+        int port, sockt;
+        struct sockaddr_in srvr_address, clnt_address;
         pthread_t pool[MAXUSERS];
     public:
         /* Constructor to define initial class params */
@@ -217,6 +215,7 @@ void* MessageHandler(void* args) {
                                 user_info.set_ip(user.ip);
                                 user_info.set_status(user.status);
                                 flag = 1;
+                                break;
                             }
                         }
                         if(flag) {
@@ -251,9 +250,10 @@ void* MessageHandler(void* args) {
                             new_status->set_username(clnt_rqst.status().username());
                             new_status->set_status(clnt_rqst.status().status());
                             flag = 1;
+                            break;
                         }
                     }
-                    if(flag) {
+                    if(flag == 1) {
                         /* Username found */
                         response.set_option(chat::ServerResponse_Option_STATUS_CHANGE);
                         response.set_code(chat::ServerResponse_Code_SUCCESSFUL_OPERATION);
@@ -278,7 +278,7 @@ void* MessageHandler(void* args) {
                     if(mode == "all") {
                         /* Public chat */
                         pthread_mutex_lock(&public_chat);
-                        /* Set message object */
+                        /* Set Message object */
                         chat::Message* messsage(new chat::Message);
                         messsage->set_receiver(clnt_rqst.messg().receiver());
                         messsage->set_sender(clnt_rqst.messg().sender());
@@ -299,6 +299,44 @@ void* MessageHandler(void* args) {
                         pthread_mutex_unlock(&public_chat);
                     } else {
                         /* Private chat */
+                        pthread_mutex_lock(&private_chat);
+                        /* Set Message object */
+                        chat::Message* messsage(new chat::Message);
+                        messsage->set_receiver(clnt_rqst.messg().receiver());
+                        messsage->set_sender(clnt_rqst.messg().sender());
+                        messsage->set_text(clnt_rqst.messg().text());
+                        /* Set Server Response */
+                        chat::ServerResponse response;
+                        int flag = 0;
+                        for(struct USER& user: users) {
+                            /* Check if username exists */
+                            if(user.username == clnt_rqst.messg().receiver()) {
+                                response.set_option(chat::ServerResponse_Option_SEND_MESSAGE);
+                                response.set_code(chat::ServerResponse_Code_SUCCESSFUL_OPERATION);
+                                response.set_allocated_messg(messsage);
+                                /* Send message to user */
+                                std::string clnt_msg;
+                                response.SerializeToString(&clnt_msg);
+                                char msg[clnt_msg.size() + 1];
+                                strcpy(msg,clnt_msg.c_str());
+                                send(user.sockt,msg,strlen(msg),0);
+                                flag = 1;
+                                break;
+                            }
+                        }
+                        if(flag == 0) {
+                            /* Username not found */
+                            response.set_option(chat::ServerResponse_Option_SEND_MESSAGE);
+                            response.set_code(chat::ServerResponse_Code_FAILED_OPERATION);
+                            response.set_response("User not found");
+                            /* Send message to user */
+                            std::string clnt_msg;
+                            response.SerializeToString(&clnt_msg);
+                            char msg[clnt_msg.size() + 1];
+                            strcpy(msg,clnt_msg.c_str());
+                            send(u_sockt,msg,strlen(msg),0);
+                        }
+                        pthread_mutex_unlock(&private_chat);
                     }
                     break;
                 }
@@ -339,5 +377,7 @@ int main(int argc,char* argv[]) {
         return EXIT_FAILURE;
     }
     printf("> Server set up successfully\n");
+    printf("> Checking for connections on port %d ...\n",port);
+    srvr.CheckConnections();
     return EXIT_SUCCESS;
 }
