@@ -204,12 +204,6 @@ void* MessageHandler(void* args) {
                         response.set_code(chat::ServerResponse_Code_FAILED_OPERATION);
                         chat::UserInformation* users_info(new chat::UserInformation);
                         response.set_allocated_user(users_info);
-                        /* Send Server response */
-                        std::string clnt_msg;
-                        response.SerializeToString(&clnt_msg);
-                        char msg[clnt_msg.size() + 1];
-                        strcpy(msg,clnt_msg.c_str());
-                        send(u_sockt,msg,strlen(msg),0);
                     } else {
                         /* If client wants specific user information */
                         chat::UserInformation* user_info(new chat::UserInformation);
@@ -234,17 +228,46 @@ void* MessageHandler(void* args) {
                             response.set_code(chat::ServerResponse_Code_FAILED_OPERATION);
                             response.set_allocated_user(user_info);
                         }
-                        /* Send Server response */
-                        std::string clnt_msg;
-                        response.SerializeToString(&clnt_msg);
-                        char msg[clnt_msg.size() + 1];
-                        strcpy(msg,clnt_msg.c_str());
-                        send(u_sockt,msg,strlen(msg),0);
                     }
+                    /* Send Server response */
+                    std::string clnt_msg;
+                    response.SerializeToString(&clnt_msg);
+                    char msg[clnt_msg.size() + 1];
+                    strcpy(msg,clnt_msg.c_str());
+                    send(u_sockt,msg,strlen(msg),0);
                     break;
                 }
                 case 3: {
                     /* Change status */
+                    chat::ChangeStatus* new_status(new chat::ChangeStatus);
+                    chat::ServerResponse response;
+                    int flag = 0;
+                    for(struct USER& user: users) {
+                        /* Check if username exists */
+                        if(user.username = clnt_rqst.status().username()) {
+                            user.status = clnt_rqst.status().status();
+                            new_status->set_username(clnt_rqst.status().username());
+                            new_status->set_status(clnt_rqst.status().status());
+                            flag = 1;
+                        }
+                    }
+                    if(flag) {
+                        /* Username found */
+                        response.set_option(chat::ServerResponse_Option_STATUS_CHANGE);
+                        response.set_code(chat::ServerResponse_Code_SUCCESSFUL_OPERATION);
+                        response.set_allocated_status(new_status);
+                    } else {
+                        /* Username not found */
+                        response.set_option(chat::ServerResponse_Option_STATUS_CHANGE);
+                        response.set_code(chat::ServerResponse_Code_FAILED_OPERATION);
+                        response.set_allocated_status(new_status);
+                    }
+                    /* Send Server response */
+                    std::string clnt_msg;
+                    response.SerializeToString(&clnt_msg);
+                    char msg[clnt_msg.size() + 1];
+                    strcpy(msg,clnt_msg.c_str());
+                    send(u_sockt,msg,strlen(msg),0);
                     break;   
                 }
                 case 4: {
