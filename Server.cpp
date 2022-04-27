@@ -10,6 +10,7 @@
 #include "protocol.pb.h"
 
 #define MAXUSERS 10
+#define BUFFSIZE 2048
 
 /* Struct to store user information */
 struct USER {
@@ -26,7 +27,6 @@ class Server {
         int sockt;
         struct sockaddr_in srvr_address;
         struct sockaddr_in clnt_address;
-        int buff_size;
         int user_count;
         std::vector<USER> users;
         pthread_t pool[MAXUSERS];
@@ -34,7 +34,6 @@ class Server {
         /* Constructor to define initial class params */
         Server(int s_port) {
             this->port = s_port;
-            this->buff_size = 2048;
             this->user_count = 0;
         }
 
@@ -80,8 +79,8 @@ class Server {
                     printf("> Error accepting requests\n");
                 }
                 /* Read socket information */
-                char buff[this->buff_size] = {0};
-                int vread = recv(n_sockt,buff,this->buff_size,0);
+                char buff[BUFFSIZE] = {0};
+                int vread = recv(n_sockt,buff,BUFFSIZE,0);
                 if(vread < 0) {
                     printf("> Error reading socket information\n");
                 }
@@ -118,7 +117,7 @@ class Server {
                         response.set_option(chat::ServerResponse_Option_USER_LOGIN);
                         response.set_code(chat::ServerResponse_Code_SUCCESSFUL_OPERATION);
                         response.set_response("Successful User Registration");
-                        /* ==============  MULTITHREADING PENDING HERE  ============== */
+                        pthread_create(&this->pool[this->user_count],NULL,MessageHandler,(void*)&new_user);
                         this->user_count += 1;
                     } else {
                         /* Set error server response (Username already registered) */
@@ -138,6 +137,13 @@ class Server {
                 strcpy(msg,ser_str.c_str());
                 send(n_sockt,msg,strlen(msg),0);
             }
+        }
+
+        /* Function to create new thread with new user */
+        static void* MessageHandler(void* args) {
+            char buff[BUFFSIZE];
+            struct USER *n_user = (struct USER*)args;
+            int open_conn = 1;
         }
 };
 
