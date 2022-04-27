@@ -12,9 +12,6 @@
 #define MAXUSERS 10
 #define BUFFSIZE 2048
 
-void* MessageHandler(void* args);
-int user_count = 0;
-
 /* Struct to store user information */
 struct USER {
     std::string username;
@@ -23,6 +20,10 @@ struct USER {
     int sockt;
 }
 
+void* MessageHandler(void* args);
+int user_count = 0;
+std::vector<USER> users;
+
 /* Server class */
 class Server {
     private:
@@ -30,7 +31,6 @@ class Server {
         int sockt;
         struct sockaddr_in srvr_address;
         struct sockaddr_in clnt_address;
-        std::vector<USER> users;
         pthread_t pool[MAXUSERS];
     public:
         /* Constructor to define initial class params */
@@ -98,7 +98,7 @@ class Server {
                     printf("> New user registration ...\n");
                     /* Check if new username is already registered */
                     int flag = 1;
-                    for(auto user = this->users.begin();user != this->users.end();user++) {
+                    for(auto user = users.begin();user != users.end();user++) {
                         if(user->username == clnt_rqst.newuser().username()) {
                             /* Username is already registered */
                             printf("> Username is already registered\n");
@@ -114,7 +114,7 @@ class Server {
                         new_user.status = "ACTIVE";
                         new_user.sockt = n_sockt;
                         /* Append new user to user list */
-                        this->users.push_back(new_user);
+                        users.push_back(new_user);
                         /* Set correct server response */
                         response.set_option(chat::ServerResponse_Option_USER_LOGIN);
                         response.set_code(chat::ServerResponse_Code_SUCCESSFUL_OPERATION);
@@ -162,7 +162,52 @@ void* MessageHandler(void* args) {
             std::string clnt_msg = buff;
             chat::ClientRequest clnt_rqst;
             clnt_rqst.ParseFromString(clnt_msg);
-            /* ============ HANDLE USER OPTIONS HERE  ============ */
+            /* Handle client requests */
+            int opt = clnt_rqst.option();
+            switch(opt) {
+                case 0:
+                    /* User registration */
+                    printf("> User already registered\n");
+                    break;
+                case 1: {
+                    /* Connected users */
+                    chat::ConnectedUsers* conn_users(new chat::ConnectedUsers);
+                    for(struct USER& user: users) {
+                        /* Obtain connected users information */
+                        chat::UserInformation* user_info = conn_users>add_users();
+                        user_info->set_username(user.username);
+                        user_info->set_ip(user.ip);
+                        user_info->set_status(user.status);
+                    }
+                    /* Set Server response */
+                    chat::ServerResponse response;
+                    response.set_option(chat::ServerResponse_Option_USER_LOGIN);
+                    response.set_code(chat::ServerResponse_Code_SUCCESSFUL_OPERATION);
+                    response.set_allocated_users(conn_users);
+                    /* Send Server response */
+                    std::string clnt_msg;
+                    response.SerializeToString(&clnt_msg);
+                    char msg[clnt_msg.size() + 1];
+                    strcpy(msg,clnt_msg.c_str());
+                    send(u_sockt,msg,strlen(msg),0);
+                    break;
+                }
+                case 2: {
+                    /* User information */
+                    break;
+                }
+                case 3: {
+                    /* Change status */
+                    break;   
+                }
+                case 4: {
+                    /* Send message (Chat) */
+                    break;
+                }
+                default:
+                    /* Unknown operation (Error) */
+                    printf("> Unknown operation, try again...\n");
+            }
         }
     }
     /* Close user socket connection */
@@ -177,6 +222,7 @@ void* MessageHandler(void* args) {
 /* Javier Ramirez Cospin 18099 */
 /* Cesar Vinicio Rodas 16776 */
 int main(int argc,char* argv[]) {
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
     /* Checking number of parameters */
     if(argc != 2) {
         printf("> Not enough arguments ...\n");
