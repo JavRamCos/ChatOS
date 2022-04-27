@@ -194,6 +194,53 @@ void* MessageHandler(void* args) {
                 }
                 case 2: {
                     /* User information */
+                    std::string clnt_name = clnt_rqst.user().user();
+                    chat::ServerResponse response;
+                    if(clnt_name == "all") {
+                        /* If client wants all users information */
+                        printf("> Functionality not implemented, use Connected Users instead\n");
+                        /* Set Server response */
+                        response.set_option(chat::ServerResponse_Option_USER_INFORMATION);
+                        response.set_code(chat::ServerResponse_Code_FAILED_OPERATION);
+                        chat::UserInformation* users_info(new chat::UserInformation);
+                        response.set_allocated_user(users_info);
+                        /* Send Server response */
+                        std::string clnt_msg;
+                        response.SerializeToString(&clnt_msg);
+                        char msg[clnt_msg.size() + 1];
+                        strcpy(msg,clnt_msg.c_str());
+                        send(u_sockt,msg,strlen(msg),0);
+                    } else {
+                        /* If client wants specific user information */
+                        chat::UserInformation* user_info(new chat::UserInformation);
+                        int flag = 0;
+                        for(struct USER& user: users) {
+                            /* Check if username exists */
+                            if(user.username == clnt_name) {
+                                user_info.set_username(user.username);
+                                user_info.set_ip(user.ip);
+                                user_info.set_status(user.status);
+                                flag = 1;
+                            }
+                        }
+                        if(flag) {
+                            /* Username found */
+                            response.set_option(chat::ServerResponse_Option_USER_INFORMATION);
+                            response.set_code(chat::ServerResponse_Code_SUCCESSFUL_OPERATION);
+                            response.set_allocated_user(user_info);
+                        } else {
+                            /* Username not found */
+                            response.set_option(chat::ServerResponse_Option_USER_INFORMATION);
+                            response.set_code(chat::ServerResponse_Code_FAILED_OPERATION);
+                            response.set_allocated_user(user_info);
+                        }
+                        /* Send Server response */
+                        std::string clnt_msg;
+                        response.SerializeToString(&clnt_msg);
+                        char msg[clnt_msg.size() + 1];
+                        strcpy(msg,clnt_msg.c_str());
+                        send(u_sockt,msg,strlen(msg),0);
+                    }
                     break;
                 }
                 case 3: {
@@ -207,6 +254,7 @@ void* MessageHandler(void* args) {
                 default:
                     /* Unknown operation (Error) */
                     printf("> Unknown operation, try again...\n");
+                    break;
             }
         }
     }
