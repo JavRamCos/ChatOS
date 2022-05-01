@@ -4,6 +4,7 @@
 #include <netdb.h>
 #include <pthread.h>
 #include <map>
+#include <unistd.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include "protocol.pb.h"
@@ -11,6 +12,7 @@
 #define BUFFSIZE 4096
 
 int sockt;
+pthread_mutex_t locker = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t thdcond = PTHREAD_COND_INITIALIZER;
 std::string status = "ACTIVE";
 std::vector<chat::Message> gen_chat;
@@ -32,10 +34,10 @@ void* RequestHandler(void* args) {
             case 1: {
                 /* Connected Users */
                 for(const chat::UserInformation& user : repsonse.users().users()) {
-                    std::string user_name = user.username();
+                    std::string usr_name = user.username();
                     std::string user_ip = user.ip();
                     std::string user_status = user.status();
-                    printf("Username: %s\n",user_name.c_str());
+                    printf("Username: %s\n",usr_name.c_str());
                     printf("User IP: %s\n",user_ip.c_str());
                     printf("User Status: %s\n",user_status.c_str);
                 }
@@ -44,10 +46,10 @@ void* RequestHandler(void* args) {
             }
             case 2: {
                 /* User information */
-                std::string user_name = response.user().username();
+                std::string usr_name = response.user().username();
                 std::string user_ip = response.user().ip();
                 std::string user_status = response.user().status();
-                pritnf("Username: %s\n",user_name.c_str());
+                pritnf("Username: %s\n",usr_name.c_str());
                 printf("User IP: %s\n",user_ip.c_str());
                 printf("User Status: %s\n",user_status.c_str());
                 pthread_cond_signal(&thdcond);
@@ -155,11 +157,208 @@ int main(int argc,char* argv[]) {
         return EXIT_FAILURE;
     }
     /* Client petition variables initiation */
-    chat::ClientRequest clnt_pet;
-    std::string rqst_str;
+    int opt;
     std::string text;
     std::string receiver;
     pthread_t thd;
     pthread_create(&thd,NULL,RequestHandler,NULL);
+    int lp_flag = 1;
+    /* Client main loop */
+    while(lp_flag) {
+        /* Display options to user */
+        printf("Options: \n");
+        printf("1. See connected users\n");
+        printf("2. Request User information\n");
+        printf("3. Change status\n");
+        printf("4. General chat\n");
+        printf("5. Private message\n");
+        printf("6. Exit\n");
+        scanf("%d",&opt);
+        /* Handle user option */
+        switch(opt) {
+            case 1: {
+                /* Connected users */
+                chat::UserRequest* user_rqst(new chat::UserRequest);
+                user_rqst->set_user("all");
+                chat::ClientRequest clnt_pet;
+                clnt_pet.set_option(chat::ClientRequest_Option_CONNECTED_USERS);
+                clnt_pet.set_allocated_user(user_rqst);
+                /* Send request to server */
+                std::string messg;
+                clnt_pet.SerializeToString(&messg);
+                char msg[messg,size() + 1];
+                strcpy(msg,messg.c_str());
+                send(sockt,msg,strlen(msg),0);
+                pthread_cond_wait(&thdcond,&locker);
+                break;
+            } 
+            case 2: {  
+                /* User information */
+                printf("> Enter 'all' for all users information\n");
+                printf("> Enter username for specific username\n");
+                std::string usr_name;
+                getline(std::cin,usr_name);
+                /* Set request */
+                chat::UserRequest* user_rqst(new chat::UserRequest);
+                user_rqst->set_user(usr_name);
+                chat::ClientRequest clnt_pet;
+                clnt_pet.set_option(chat::ClientRequest_Option_USER_INFORMATION);
+                /* Send request to server */
+                std::string messg;
+                clnt_pet.SerializeToString(&messg);
+                char msg[messg.size() + 1];
+                strcpy(msg,messg.c_str());
+                send(sockt,msg,strlen(msg),0);
+                pthread_cond_wait(&thdcond,&locker);
+                break;
+            }
+            case 3: {
+                /* Change status */
+                printf("1. See current status\n");
+                printf("2. Change status\n");
+                int st_opt;
+                scanf("%d",&st_opt);
+                switch(st_opt) {
+                    case 1: {
+                        /* Display current status */
+                        printf("Current status: %s\n",status.c_str());
+                        break;
+                    }
+                    case 2: {
+                        /* Set new status */
+                        printf("Enter new status: ");
+                        std::string n_status;
+                        getline(std::cin,n_status);
+                        transform(n_status.begin(),n_status.end(),n_status.begin(),::toupper);
+                        status = n_status;
+                        /* Set request */
+                        chat::ChangeStatus* sts_rqst(new chat::ChangeStatus);
+                        sts_rqst->set_username(user_name);
+                        sts_rqst->set_status(status);
+                        chat::ClientRequest clnt_pet;
+                        clnt_pet.set_option(chat::ClientRequest_Option_CHANGE_STATUS);
+                        clnt_pet.set_allocated_status(sts_rqst);
+                        /* Send request to server */
+                        std::string messg;
+                        clnt_pet.SerializeToString(&messg);
+                        char msg[messg.size() + 1];
+                        strcpy(msg,messg.c_str());
+                        send(sockt,msg,strlen(msg),0);
+                        pthread_cond_wait(&thdcond,&locker);
+                        printf("> Status updated correctly\n");
+                        break;
+                    }
+                    default: 
+                        printf("> Invalid operation\n");
+                        break;
+                }
+                break;
+            }
+            case 4: {
+                /* General chat */
+                for(chat::Message& message : gen_chat) {
+                    /* Display General chat messages */
+                    printf("@%s: %s\n",message.sender().c_str(),message.text().c_str());
+                }
+                printf("1. Send message\n");
+                printf("2. Continue\n");
+                int gmsg_opt;
+                scanf("%d",&gmsg_opt);
+                switch(gmsg_opt) {
+                    case 1: {
+                        /* Send message to general chat */
+                        printf("Message: ");
+                        std::string txt;
+                        getline(std::cin,txt);
+                        /* Set request */
+                        chat::Message* msg_rqst(new chat::Message);
+                        msg_rqst->set_text(txt);
+                        msg_rqst->set_receiver("all");
+                        msg_rqst->set_sender(user_name);
+                        chat::ClientRequest clnt_pet;
+                        clnt_pet.set_option(chat::ClientRequest_Option_SEND_MESSAGE);
+                        clnt_pet.set_allocated_messg(msg_rqst);
+                        /* Send request to server */
+                        std::string messg;
+                        clnt_pet.SerializeToString(&messg);
+                        char msg[messg.size() + 1];
+                        strcpy(msg,messg.c_str());
+                        send(sockt,msg,strlen(msg),0);
+                        break;
+                    }
+                    default:
+                        break;
+                }
+                break;
+            }
+            case 5: {
+                /* Private chat */
+                printf("Enter username: ");
+                std::string usr_name;
+                getline(std::cin,usr_name);
+                if(prv_chat.find(usr_name) != prv_chat.end()) {
+                    std::vector<chat::Message> messsages = prv_chat[usr_name];
+                    for(chat::Message& msg : messsages) {
+                        printf("@%s: %s",msg.sender().c_str(),msg.text().c_str());
+                    } 
+                }
+                printf("1. Send message to %s\n",usr_name.c_str());
+                printf("2. Continue\n");
+                int pmsg_opt;
+                scanf("%d",&pmsg_opt);
+                switch(pmsg_opt) {
+                    case 1: {
+                        /* Send message to specific user */
+                        printf("Message: ");
+                        std::string txt;
+                        getline(std::cin,txt);
+                        /* Set request */
+                        chat::Message* msg_rqst(new chat::Message);
+                        msg_rqst->set_text(txt);
+                        msg_rqst->set_receiver(usr_name);
+                        msg_rqst->set_sender(user_name);
+                        chat::ClientRequest clnt_pet;
+                        clnt_pet.set_option(chat::ClientRequest_Option_SEND_MESSAGE);
+                        clnt_pet.set_allocated_messg(msg_rqst);
+                        /* Set sender message */
+                        chat::Message sndr_msg;
+                        sndr_msg.set_text(txt);
+                        sndr_msg.set_receiver(usr_name);
+                        sndr_msg.set_sender(user_name);
+                        if(prv_chat.find(sndr_msg.receiver()) == prv_chat.end()) {
+                            std::vector<chat::Message> n_msg;
+                            n_msg.push_back(sndr_msg);
+                            prv_chat[sndr_msg.receiver()] = n_msg;
+                        } else {
+                            std::vector<chat::Message> messages = prv_chat[sndr_msg.receiver()];
+                            messages.push_back(sndr_msg);
+                            prv_chat[sndr_msg.receiver()] = messages;
+                        }
+                        /* Send request to server */
+                        std::string messg;
+                        clnt_pet.SerializeToString(&messg);
+                        char msg[messg.size() + 1];
+                        strcpy(msg,messg.c_str());
+                        send(sockt,msg,strlen(msg),0);
+                        break;
+                    }
+                    default:
+                        break;
+                }
+                break;
+            }
+            case 6: {
+                printf("> Closing session\n");
+                lp_flag = 0;
+                break;
+            }
+            default: {
+                printf("> Invalid operation ...\n");
+                break;
+            }
+        }
+    }
+    close(sockt);
+    google::protobuf::ShutdownProtobufLibrary();
     return EXIT_SUCCESS;
 }
