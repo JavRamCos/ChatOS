@@ -3,12 +3,91 @@
 #include <string>
 #include <netdb.h>
 #include <pthread.h>
+#include <map>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include "protocol.pb.h"
 
 #define BUFFSIZE 4096
 
+int sockt;
+pthread_cond_t thdcond = PTHREAD_COND_INITIALIZER;
+std::string status = "ACTIVE";
+std::vector<chat::Message> gen_chat;
+std::map<std::string,std::vector<chat::Message>> prv_chat;
+
+/* Function to create new thread with new client */
+void* RequestHandler(void* args) {
+    while(1) {
+        /* Receive Server response */
+        char buff[BUFFSIZE] = {0};
+        int resp_size = recv(sockt,buff,BUFFSIZE,0);
+        buff[resp_size] = '\0';
+        std::string resp = buff;
+        /* Handle Server response */
+        chat::ServerResponse response;
+        response.ParseFromString(resp);
+        int opt = response.option();
+        switch(opt) {
+            case 1: {
+                /* Connected Users */
+                for(const chat::UserInformation& user : repsonse.users().users()) {
+                    std::string user_name = user.username();
+                    std::string user_ip = user.ip();
+                    std::string user_status = user.status();
+                    printf("Username: %s\n",user_name.c_str());
+                    printf("User IP: %s\n",user_ip.c_str());
+                    printf("User Status: %s\n",user_status.c_str);
+                }
+                pthread_cond_signal(&thdcond);
+                break;
+            }
+            case 2: {
+                /* User information */
+                std::string user_name = response.user().username();
+                std::string user_ip = response.user().ip();
+                std::string user_status = response.user().status();
+                pritnf("Username: %s\n",user_name.c_str());
+                printf("User IP: %s\n",user_ip.c_str());
+                printf("User Status: %s\n",user_status.c_str());
+                pthread_cond_signal(&thdcond);
+                break;
+            }
+            case 3: {
+                /* Change status */
+                status = response.status().status();
+                printf("New status: %s\n",status.c_str());
+                pthread_cond_signal(&thdcond);
+                break;
+            }
+            case 4: {
+                /* Messages */
+                if(response.messg().receiver() == "all") {
+                    gen_chat.push_back(response.messg());
+                } else {
+                    if(prv_chat.find(response.messg().sender()) == prv_chat.end()) {
+                        std::vector<chat::Message> n_msg;
+                        n_msg.push_back(response.messg());
+                        prv_chat[response.messg().sender()] = n_msg;
+                    } else {
+                        std::vector<chat::Message> msgs = prv_chat[response.messg().sender()];
+                        msgs.push_back(response.messg());
+                        prv_chat[response.messg().sender()] = msgs;
+                    }
+                }
+                break;
+            }
+            default: {
+                printf("Unknown operation\n");
+                break;
+            }
+        }
+    }
+}
+
+/* Program for Client, Chat Proyect */
+/* Javier Ramirez Cospin 18099 */
+/* Cesar Vinicio Rodas 16776 */
 int main(int argc,char* argv[]) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
     /* Parameter verification */
@@ -27,7 +106,7 @@ int main(int argc,char* argv[]) {
         return  EXIT_FAILURE;
     }
     /* Socket creation */
-    int sockt = socket(AF_INET,SOCK_STREAM,0);
+    sockt = socket(AF_INET,SOCK_STREAM,0);
     if(sockt < 0) {
         printf("> Error creating socket\n");
         return  EXIT_FAILURE;
@@ -81,5 +160,6 @@ int main(int argc,char* argv[]) {
     std::string text;
     std::string receiver;
     pthread_t thd;
+    pthread_create(&thd,NULL,RequestHandler,NULL);
     return EXIT_SUCCESS;
 }
