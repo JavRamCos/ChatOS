@@ -150,16 +150,20 @@ int main(int argc,char* argv[]) {
     /* Handle Server response */
     chat::ServerResponse response;
     response.ParseFromString(resp);
-    if(response.code() == 1 && response.option() == 0) {
+    if(response.code() == chat::ServerResponse_Code_SUCCESSFUL_OPERATION && response.option() == chat::ServerResponse_Option_USER_LOGIN) {
         printf("> Login successfull\n");
-    } else {
+    } else if(response.code() == chat::ServerResponse_Code_FAILED_OPERATION && response.option() == chat::ServerResponse_Option_USER_LOGIN) {
         printf("> Login unsuccessfull\n");
+        perror("> Login: ");
+        return EXIT_FAILURE;
+    } else {
+        printf("> Error retrieving server response\n");
+        perror("> Server response: ");
         return EXIT_FAILURE;
     }
     /* Client petition variables initiation */
     int opt;
     std::string text;
-    std::string receiver;
     pthread_t thd;
     pthread_create(&thd,NULL,RequestHandler,NULL);
     int lp_flag = 1;
@@ -203,6 +207,7 @@ int main(int argc,char* argv[]) {
                 user_rqst->set_user(usr_name);
                 chat::ClientRequest clnt_pet;
                 clnt_pet.set_option(chat::ClientRequest_Option_USER_INFORMATION);
+                clnt_pet.set_allocated_user(user_rqst);
                 /* Send request to server */
                 std::string messg;
                 clnt_pet.SerializeToString(&messg);
