@@ -31,11 +31,13 @@ pthread_mutex_t private_chat = PTHREAD_MUTEX_INITIALIZER;
 class Server {
     private:
         int port, sockt;
-        struct sockaddr_in srvr_address, clnt_address;
+        struct sockaddr_in srvr_address;
+        struct sockaddr clnt_address;
         pthread_t pool[MAXUSERS];
     public:
         /* Constructor to define initial class params */
         Server(int s_port) {
+            memset(&clnt_address,0,sizeof(struct sockaddr));
             this->port = s_port;
         }
 
@@ -80,6 +82,7 @@ class Server {
                 int n_sockt = accept(this->sockt,(struct sockaddr*)&this->clnt_address,(socklen_t*)sizeof(this->clnt_address));
                 if(n_sockt < 0) {
                     printf("> Error accepting request\n");
+                    perror("> Accept: ");
                     continue;
                 }
                 /* Read socket information */
@@ -122,6 +125,11 @@ class Server {
                         response.set_option(chat::ServerResponse_Option_USER_LOGIN);
                         response.set_code(chat::ServerResponse_Code_SUCCESSFUL_OPERATION);
                         response.set_response("Successful User Registration");
+                        /* Send Server response to socket */
+                        response.SerializeToString(&clnt_msg);
+                        char msg[clnt_msg.size() + 1];
+                        strcpy(msg,clnt_msg.c_str());
+                        send(n_sockt,msg,strlen(msg),0);
                         /* Create new user thread */
                         pthread_create(&this->pool[user_count],NULL,MessageHandler,(void*)&new_user);
                         user_count += 1;
@@ -130,18 +138,23 @@ class Server {
                         response.set_option(chat::ServerResponse_Option_USER_LOGIN);
                         response.set_code(chat::ServerResponse_Code_FAILED_OPERATION);
                         response.set_response("Username already registered");
+                        /* Send Server response to socket */
+                        response.SerializeToString(&clnt_msg);
+                        char msg[clnt_msg.size() + 1];
+                        strcpy(msg,clnt_msg.c_str());
+                        send(n_sockt,msg,strlen(msg),0);
                     }
                 } else {
                     /* Set error server response (Unsuccessful user registration) */
                     response.set_option(chat::ServerResponse_Option_USER_LOGIN);
                     response.set_code(chat::ServerResponse_Code_FAILED_OPERATION);
                     response.set_response("Unsuccessful User Registration");
+                    /* Send server response to socket */
+                    response.SerializeToString(&clnt_msg);
+                    char msg[clnt_msg.size() + 1];
+                    strcpy(msg,clnt_msg.c_str());
+                    send(n_sockt,msg,strlen(msg),0);
                 }
-                /* Send server response to socket */
-                response.SerializeToString(&clnt_msg);
-                char msg[clnt_msg.size() + 1];
-                strcpy(msg,clnt_msg.c_str());
-                send(n_sockt,msg,strlen(msg),0);
             }
         } 
 };
