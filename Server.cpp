@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 #include <string>
 #include <pthread.h>
@@ -53,9 +54,10 @@ class Server {
                 return -1;
             }
             /* Address format */
+            memset(&srvr_address,0,sizeof(srvr_address));
             this->srvr_address.sin_family = AF_INET;
             this->srvr_address.sin_port = htons(this->port);
-            this->srvr_address.sin_addr.s_addr = INADDR_ANY;
+            inet_aton("127.0.0.1",&srvr_address.sin_addr);
             /* Socket binding */
             int bind_flag = bind(this->sockt,(struct sockaddr*)&this->srvr_address,sizeof(this->srvr_address));
             if(bind_flag < 0) {
