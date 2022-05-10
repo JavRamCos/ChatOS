@@ -79,7 +79,8 @@ class Server {
                 /* Accept sockets requests */
                 int n_sockt = accept(this->sockt,(struct sockaddr*)&this->clnt_address,(socklen_t*)sizeof(this->clnt_address));
                 if(n_sockt < 0) {
-                    printf("> Error accepting requests\n");
+                    printf("> Error accepting request\n");
+                    continue;
                 }
                 /* Read socket information */
                 char buff[BUFFSIZE] = {0};
