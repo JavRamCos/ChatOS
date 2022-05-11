@@ -33,12 +33,14 @@ class Server {
         int port, sockt;
         struct sockaddr_in srvr_address;
         struct sockaddr clnt_address;
+        socklen_t clnt_size;
         pthread_t pool[MAXUSERS];
     public:
         /* Constructor to define initial class params */
         Server(int s_port) {
             memset(&clnt_address,0,sizeof(struct sockaddr));
             this->port = s_port;
+            clnt_size = sizeof(clnt_address);
         }
 
         /* Deconstructor to handle file and libraries closing */
@@ -79,7 +81,7 @@ class Server {
         void CheckConnections() {
             while(user_count < MAXUSERS) {
                 /* Accept sockets requests */
-                int n_sockt = accept(this->sockt,(struct sockaddr*)&this->clnt_address,(socklen_t*)sizeof(this->clnt_address));
+                int n_sockt = accept(this->sockt,&this->clnt_address,&this->clnt_size);
                 if(n_sockt < 0) {
                     printf("> Error accepting request\n");
                     perror("> Accept: ");
