@@ -10,7 +10,7 @@
 #include <pthread.h>
 #include "protocol.pb.h"
 
-#define MAXUSERS 10
+#define MAXUSERS 20
 #define BUFFSIZE 2048
 
 /* Struct to store user information */
